@@ -49,13 +49,11 @@ export function CreateEventPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [template, setTemplate] = useState<import("../types").Template | null>(null);
-  const [defaultCapacity, setDefaultCapacity] = useState<number | null>(null);
 
   useEffect(() => {
     if (!user) return;
     api.getPreferences(user.id).then((result) => {
       const capacity = result.data?.defaultCapacity ?? null;
-      setDefaultCapacity(capacity);
       if (!searchParams.get("templateId")) setCapacity(capacity ? String(capacity) : "");
     });
   }, [user, searchParams]);
@@ -65,7 +63,6 @@ export function CreateEventPage() {
     if (!templateId || !user) return;
     Promise.all([api.listTemplates(user.id), api.getPreferences(user.id)]).then(([result, preferenceResult]) => {
       const capacity = preferenceResult.data?.defaultCapacity ?? null;
-      setDefaultCapacity(capacity);
       const selected = result.data?.find((item) => item.id === templateId);
       if (!selected) return;
       setTemplate(selected);

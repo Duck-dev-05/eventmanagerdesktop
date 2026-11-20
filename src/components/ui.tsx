@@ -337,7 +337,9 @@ export type InputProps = {
   type?: string;
   value?: string;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onFocus?: (e: React.FocusEvent<HTMLInputElement>) => void;
   placeholder?: string;
+  readOnly?: boolean;
   disabled?: boolean;
   error?: string;
   hint?: string;
@@ -356,7 +358,9 @@ export function Input({
   type = "text",
   value,
   onChange,
+  onFocus,
   placeholder,
+  readOnly,
   disabled,
   error,
   hint,
@@ -383,7 +387,9 @@ export function Input({
         type={type}
         value={value ?? ""}
         onChange={onChange}
+        onFocus={onFocus}
         placeholder={placeholder}
+        readOnly={readOnly}
         disabled={disabled}
         autoComplete={autoComplete}
         required={required}

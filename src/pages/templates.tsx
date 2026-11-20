@@ -63,6 +63,7 @@ export function TemplatesPage() {
   if (!user) {
     return <p className="text-[12.5px] text-muted">No templates available.</p>;
   }
+  const currentUser = user;
 
   async function saveTemplate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault(); setSaving(true); setError("");
@@ -77,7 +78,7 @@ export function TemplatesPage() {
     const agendaPresets = agendaText.split("\n").map((line) => line.trim()).filter(Boolean).map((title) => ({ title, description: "", durationMinutes: 30 }));
     const taskPresets = taskText.split("\n").map((line) => line.trim()).filter(Boolean).map((title) => ({ title, notes: "" }));
     try {
-      const result = await api.createTemplate(user.id, { name, category, description, defaultVenue: venue, defaultCapacity: parsedCapacity, defaultDurationMinutes: parsedDuration, agendaPresets, taskPresets });
+      const result = await api.createTemplate(currentUser.id, { name, category, description, defaultVenue: venue, defaultCapacity: parsedCapacity, defaultDurationMinutes: parsedDuration, agendaPresets, taskPresets });
       if (result.success && result.data) {
         setTemplates((previous) => [result.data!, ...previous]); setShowCreate(false); setName(""); setDescription(""); setVenue(""); setCapacity(""); setAgendaText(""); setTaskText("");
       } else setError(result.error || "Could not create template.");
