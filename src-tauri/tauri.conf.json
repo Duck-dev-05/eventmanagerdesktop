@@ -21,7 +21,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost https: data:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://eventmanager-5dsz.vercel.app https://www.googleapis.com"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost https: data:; font-src 'self' data:; connect-src 'self' ipc: http://ipc.localhost https://eventmanager-5dsz.vercel.app https://www.googleapis.com https://api.github.com"
     }
   },
   "bundle": {

@@ -6,6 +6,7 @@ import { emit, listen } from "@tauri-apps/api/event";
 import { api } from "./lib/api";
 import type { SessionUser } from "./types";
 import { Layout } from "./components/layout";
+import { DesktopUpdateNotice } from "./components/desktop-update-notice";
 import { LoginPage } from "./pages/login";
 import { ForgotPasswordPage } from "./pages/forgot-password";
 import { SignUpPage } from "./pages/signup";
@@ -262,6 +263,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <SyncRefresher>
+        <DesktopUpdateNotice />
         <Routes>
           <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
           <Route path="/forgot-password" element={<GuestRoute><ForgotPasswordPage /></GuestRoute>} />
