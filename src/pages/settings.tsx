@@ -28,6 +28,9 @@ export function SettingsPage() {
   const [feedMessage, setFeedMessage] = useState("");
   const [syncConnected, setSyncConnected] = useState(false);
   const [calendarError, setCalendarError] = useState("");
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [backupMessage, setBackupMessage] = useState("");
+  const [backupError, setBackupError] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -39,6 +42,55 @@ export function SettingsPage() {
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [user]);
+
+  async function handleCreateBackup() {
+    setBackupBusy(true);
+    setBackupMessage("");
+    setBackupError(false);
+    try {
+      const result = await api.createBackup();
+      if (!result.success || !result.data) throw new Error(result.error || "Could not create a backup.");
+      const backup = JSON.parse(result.data) as Record<string, unknown>;
+      backup.localSettings = Object.fromEntries(Object.entries(localStorage).filter(([key]) => key.startsWith("em:")));
+      const url = URL.createObjectURL(new Blob([JSON.stringify(backup)], { type: "application/json" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `eventpulse-desktop-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setBackupMessage("Full backup downloaded, including all local accounts, events, settings, sync data, and uploaded files. Store it somewhere safe.");
+    } catch (error) {
+      setBackupError(true);
+      setBackupMessage(error instanceof Error ? error.message : "Could not create a backup.");
+    } finally {
+      setBackupBusy(false);
+    }
+  }
+
+  async function handleRestoreBackup(file?: File) {
+    if (!file) return;
+    if (!window.confirm("Restore this full backup? It replaces all data, accounts, settings, sync state, and uploaded files on this device. This cannot be undone.")) return;
+    setBackupBusy(true);
+    setBackupMessage("");
+    setBackupError(false);
+    try {
+      const contents = await file.text();
+      const backup = JSON.parse(contents) as { localSettings?: Record<string, unknown> };
+      const result = await api.restoreBackup(contents);
+      if (!result.success) throw new Error(result.error || "Could not restore this backup.");
+      for (const key of Object.keys(localStorage)) if (key.startsWith("em:")) localStorage.removeItem(key);
+      for (const [key, value] of Object.entries(backup.localSettings ?? {})) {
+        if (key.startsWith("em:") && typeof value === "string") localStorage.setItem(key, value);
+      }
+      setBackupMessage("Backup restored successfully. Reloading the app…");
+      window.setTimeout(() => window.location.reload(), 1200);
+    } catch (error) {
+      setBackupError(true);
+      setBackupMessage(error instanceof Error ? error.message : "Could not restore this backup.");
+    } finally {
+      setBackupBusy(false);
+    }
+  }
 
   async function handleSave() {
     if (!user || !prefs) return;
@@ -172,6 +224,18 @@ export function SettingsPage() {
           <p className="mt-2 text-[11px] text-faint">Anyone with this link can read your event list. Resetting it breaks existing subscriptions.</p>
         </> : <p className="text-[12px] text-muted">{syncConnected ? calendarError || feedMessage || "Calendar feed is available when the website is online." : "Pair with the website to manage your calendar feed."}</p>}
         {feedMessage && calendarFeed && <p role="status" className="mt-2 text-[11.5px] text-muted">{feedMessage}</p>}
+      </Section>
+
+      <Section title="Full backup & restore" description="Create a portable copy of all EventPulse data stored on this device." icon={<TicketIcon className="h-4 w-4" />}>
+        <div className="space-y-3">
+          <p className="text-[12px] leading-relaxed text-muted">Backups include all local user accounts, events, event work, preferences, sync configuration and queues, and uploaded files. Backup files contain sensitive data. Restoring replaces everything currently stored on this device.</p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={() => void handleCreateBackup()} disabled={backupBusy}>{backupBusy ? "Working…" : "Download full backup"}</Button>
+            <Button variant="danger" onClick={() => document.getElementById("desktop-backup-file")?.click()} disabled={backupBusy}>Restore from backup</Button>
+            <input id="desktop-backup-file" type="file" accept=".json,application/json" className="hidden" onChange={(event) => { const file = event.currentTarget.files?.[0]; void handleRestoreBackup(file); event.currentTarget.value = ""; }} />
+          </div>
+          {backupMessage && <Alert tone={backupError ? "danger" : "success"}>{backupMessage}</Alert>}
+        </div>
       </Section>
 
       <div className="flex justify-end border-t border-line-soft pt-5">

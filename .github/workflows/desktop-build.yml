@@ -20,7 +20,7 @@ jobs:
             runner: windows-latest
             bundles: nsis,msi
           - platform: macos
-            runner: macos-14
+            runner: macos-latest
             bundles: dmg
           - platform: linux-x64
             runner: ubuntu-22.04
@@ -51,7 +51,7 @@ jobs:
         run: npm ci
 
       - name: Configure Google sign-in placeholder
-        run: node -e "require('node:fs').copyFileSync('src-tauri/google_oauth.example.json', 'src-tauri/google_oauth.json')"
+        run: node -e "require('node:fs').writeFileSync('src-tauri/google_oauth.json', JSON.stringify({installed:{client_id:'ci-placeholder.apps.googleusercontent.com',client_secret:'ci-placeholder'}}))"
 
       - name: Check and test Rust backend
         working-directory: src-tauri

@@ -359,7 +359,7 @@ export function EventDetailPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-            {hasEventRole && <Button variant="secondary" size="sm" onClick={() => navigate(`/events/${eventId}/print`)}>Print run sheet</Button>
+            {hasEventRole && <Button variant="secondary" size="sm" onClick={() => navigate(`/events/${eventId}/print`)}>Print run sheet</Button>}
             <Button variant="secondary" size="sm" onClick={downloadCalendarEvent}><DownloadIcon className="h-3.5 w-3.5" />Add to calendar</Button>
             {isOwner && <Button variant="secondary" size="sm" onClick={startDuplicate}>Duplicate</Button>}
             {canManageEvent && <Button variant="secondary" size="sm" onClick={() => navigate(`/events/${eventId}/edit`)}><SettingsIcon className="h-3.5 w-3.5" />Settings</Button>}

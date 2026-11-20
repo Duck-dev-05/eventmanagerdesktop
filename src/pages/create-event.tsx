@@ -137,7 +137,7 @@ export function CreateEventPage() {
           }
           for (const preset of template.taskPresets ?? []) {
             const item = preset as { title?: string; notes?: string };
-            await api.createEventTask(result.data.id, user.id, item.title || "Event task", item.notes || "", null);
+            await api.createEventTask(result.data.id, user.id, item.title || "Event task", item.notes || "", null, null);
           }
         }
         navigate(`/events/${result.data.id}`);

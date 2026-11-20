@@ -4,6 +4,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod auth;
+mod backup;
 mod crypto;
 mod db;
 mod events;
@@ -31,6 +32,8 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             db::init_db,
+            backup::create_backup,
+            backup::restore_backup,
             auth::sign_in,
             auth::sign_up,
             auth::sign_out,

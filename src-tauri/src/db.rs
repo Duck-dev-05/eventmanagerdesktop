@@ -75,6 +75,10 @@ fn ensure_db(conn: &Connection) -> rusqlite::Result<()> {
 
     let migrations: &[&str] = &[
         r#"
+        CREATE TABLE IF NOT EXISTS eventpulse_backup_archive (
+          table_name TEXT PRIMARY KEY,
+          rows_json TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS users (
           id TEXT PRIMARY KEY,
           name TEXT NOT NULL,

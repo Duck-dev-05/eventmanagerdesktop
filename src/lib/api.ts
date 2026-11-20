@@ -28,6 +28,8 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> 
 
 export const api = {
   initDb: () => call<string>("init_db"),
+  createBackup: () => call<CommandResult<string>>("create_backup"),
+  restoreBackup: (backupJson: string) => call<CommandResult<boolean>>("restore_backup", { backupJson }),
 
   signIn: (email: string, password: string) =>
     call<CommandResult<SessionUser>>("sign_in", { email, password }),
