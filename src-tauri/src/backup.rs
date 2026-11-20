@@ -52,10 +52,52 @@ fn row_value(value: &Value) -> Result<SqlValue, String> {
 
 fn table_names(conn: &Connection) -> rusqlite::Result<Vec<String>> {
     let mut statement = conn.prepare(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name <> 'eventpulse_backup_archive' ORDER BY name",
     )?;
     let rows = statement.query_map([], |row| row.get(0))?;
     rows.collect()
+}
+
+fn primary_key_columns(conn: &Connection, table: &str) -> rusqlite::Result<Vec<String>> {
+    let mut statement = conn.prepare(&format!(
+        "PRAGMA table_info(\"{}\")",
+        table.replace('"', "\"\"")
+    ))?;
+    let rows = statement.query_map([], |row| {
+        Ok((row.get::<_, i64>(5)?, row.get::<_, String>(1)?))
+    })?;
+    let mut columns: Vec<(i64, String)> = rows.collect::<rusqlite::Result<_>>()?;
+    columns.sort_by_key(|(order, _)| *order);
+    Ok(columns
+        .into_iter()
+        .filter(|(order, _)| *order > 0)
+        .map(|(_, name)| name)
+        .collect())
+}
+
+fn read_backup_archive(conn: &Connection) -> Result<HashMap<String, Vec<Value>>, String> {
+    let mut statement = conn
+        .prepare("SELECT table_name, rows_json FROM eventpulse_backup_archive")
+        .map_err(|error| error.to_string())?;
+    let rows = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .map_err(|error| error.to_string())?;
+    let mut archive = HashMap::new();
+    for row in rows {
+        let (name, json) = row.map_err(|error| error.to_string())?;
+        if !name.is_empty()
+            && name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+        {
+            let parsed: Vec<Value> = serde_json::from_str(&json)
+                .map_err(|_| "Archived database data is invalid.".to_string())?;
+            archive.insert(name, parsed);
+        }
+    }
+    Ok(archive)
 }
 
 fn table_columns(conn: &Connection, table: &str) -> rusqlite::Result<Vec<String>> {
@@ -115,6 +157,55 @@ fn create_backup_json(conn: &Connection, app_data: &Path) -> Result<Value, Strin
         tables.insert(table, Value::Array(table_rows));
     }
 
+    let archived = read_backup_archive(conn)?;
+    for (name, rows) in archived.iter() {
+        if let Some(native_rows) = tables.get_mut(name).and_then(Value::as_array_mut) {
+            let columns: HashSet<String> = table_columns(conn, name)
+                .map_err(|error| error.to_string())?
+                .into_iter()
+                .collect();
+            let primary_keys =
+                primary_key_columns(conn, name).map_err(|error| error.to_string())?;
+            if !primary_keys.is_empty() {
+                let by_key: HashMap<String, &Value> = rows
+                    .iter()
+                    .filter_map(|row| {
+                        let object = row.as_object()?;
+                        let key = primary_keys
+                            .iter()
+                            .map(|column| object.get(column).map(Value::to_string))
+                            .collect::<Option<Vec<_>>>()?
+                            .join("|");
+                        Some((key, row))
+                    })
+                    .collect();
+                for row in native_rows {
+                    let Some(object) = row.as_object_mut() else {
+                        continue;
+                    };
+                    let Some(key) = primary_keys
+                        .iter()
+                        .map(|column| object.get(column).map(Value::to_string))
+                        .collect::<Option<Vec<_>>>()
+                        .map(|parts| parts.join("|"))
+                    else {
+                        continue;
+                    };
+                    if let Some(extra) = by_key.get(&key).and_then(|value| value.as_object()) {
+                        for (column, value) in extra {
+                            if !columns.contains(column) {
+                                object.insert(column.clone(), value.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            tables.insert(name.clone(), Value::Array(rows.clone()));
+        }
+    }
+    tables.insert("eventpulse_backup_archive".to_string(), Value::Array(archived.iter().map(|(table_name, rows)| json!({"table_name": table_name, "rows_json": serde_json::to_string(rows).unwrap_or_default()})).collect()));
+
     Ok(json!({
         "format": BACKUP_FORMAT,
         "source": "desktop",
@@ -154,10 +245,16 @@ fn portable_upload_key(reference: &str) -> Option<String> {
         normalized.trim_start_matches('/').to_string()
     };
     let relative = path.strip_prefix("uploads/").or_else(|| {
-        path.rfind("/uploads/").map(|index| &path[index + "/uploads/".len()..])
+        path.rfind("/uploads/")
+            .map(|index| &path[index + "/uploads/".len()..])
     })?;
-    if relative.is_empty() || relative.split('/').any(|part| part.is_empty() || part == "." || part == "..")
-        || !relative.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'.' | b'_' | b'-'))
+    if relative.is_empty()
+        || relative
+            .split('/')
+            .any(|part| part.is_empty() || part == "." || part == "..")
+        || !relative
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'.' | b'_' | b'-'))
     {
         return None;
     }
@@ -166,18 +263,21 @@ fn portable_upload_key(reference: &str) -> Option<String> {
 
 fn validate_backup(backup: &mut Value, conn: &Connection) -> Result<(), String> {
     let format = backup.get("format").and_then(Value::as_str);
-    if (format != Some(BACKUP_FORMAT) && format != Some("eventpulse-desktop-backup") && format != Some("eventpulse-web-backup"))
+    if (format != Some(BACKUP_FORMAT)
+        && format != Some("eventpulse-desktop-backup")
+        && format != Some("eventpulse-web-backup"))
         || backup.get("version").and_then(Value::as_u64) != Some(BACKUP_VERSION)
     {
         return Err("This is not a supported EventPulse desktop backup.".to_string());
     }
-    let source_name = backup.get("source").and_then(Value::as_str).or_else(|| {
-        match format {
+    let source_name = backup
+        .get("source")
+        .and_then(Value::as_str)
+        .or_else(|| match format {
             Some("eventpulse-web-backup") => Some("web"),
             Some("eventpulse-desktop-backup") => Some("desktop"),
             _ => None,
-        }
-    });
+        });
     let source_tables = backup
         .get("tables")
         .and_then(Value::as_object)
@@ -187,6 +287,41 @@ fn validate_backup(backup: &mut Value, conn: &Connection) -> Result<(), String> 
         .and_then(Value::as_array)
         .ok_or("The backup has no attachment list.")?;
     let existing_names = table_names(conn).map_err(|e| e.to_string())?;
+    let existing_set: HashSet<&str> = existing_names.iter().map(String::as_str).collect();
+    let mut archived_tables: HashMap<String, Vec<Value>> = HashMap::new();
+    if let Some(entries) = source_tables
+        .get("eventpulse_backup_archive")
+        .and_then(Value::as_array)
+    {
+        for entry in entries {
+            let Some(name) = entry.get("table_name").and_then(Value::as_str) else {
+                continue;
+            };
+            let Some(rows_json) = entry.get("rows_json").and_then(Value::as_str) else {
+                continue;
+            };
+            if !name.is_empty()
+                && name
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+            {
+                let rows: Vec<Value> = serde_json::from_str(rows_json)
+                    .map_err(|_| "The backup contains invalid archived database data.")?;
+                archived_tables.insert(name.to_string(), rows);
+            }
+        }
+    }
+    for (name, rows) in source_tables {
+        if name != "eventpulse_backup_archive"
+            && !existing_set.contains(name.as_str())
+            && !name.starts_with("sqlite_")
+        {
+            let rows = rows
+                .as_array()
+                .ok_or("The backup contains an invalid archived table.")?;
+            archived_tables.insert(name.clone(), rows.clone());
+        }
+    }
     let mut adapted_tables = Map::new();
     for table in &existing_names {
         let columns: HashSet<String> = table_columns(conn, table)
@@ -194,53 +329,95 @@ fn validate_backup(backup: &mut Value, conn: &Connection) -> Result<(), String> 
             .into_iter()
             .collect();
         let rows = match source_tables.get(table) {
-            Some(value) => value.as_array().cloned().ok_or("The backup contains an invalid table.")?,
+            Some(value) => value
+                .as_array()
+                .cloned()
+                .ok_or("The backup contains an invalid table.")?,
             None => Vec::new(),
         };
         let mut adapted_rows = Vec::new();
+        let mut has_extra_columns = false;
         for row in rows {
-            let object = row.as_object().ok_or("The backup contains an invalid database row.")?;
-            adapted_rows.push(Value::Object(object.iter()
-                .filter(|(column, _)| columns.contains(*column))
-                .map(|(column, value)| (column.clone(), value.clone()))
-                .collect()));
+            let object = row
+                .as_object()
+                .ok_or("The backup contains an invalid database row.")?;
+            has_extra_columns |= object.keys().any(|column| !columns.contains(column));
+            adapted_rows.push(Value::Object(
+                object
+                    .iter()
+                    .filter(|(column, _)| columns.contains(*column))
+                    .map(|(column, value)| (column.clone(), value.clone()))
+                    .collect(),
+            ));
+        }
+        if has_extra_columns {
+            if let Some(source_rows) = source_tables.get(table).and_then(Value::as_array) {
+                archived_tables.insert(table.clone(), source_rows.clone());
+            }
         }
         adapted_tables.insert(table.clone(), Value::Array(adapted_rows));
     }
 
     let mut adapted_files = Vec::new();
     for file in source_files {
-        let key = file.get("key").and_then(Value::as_str).ok_or("The backup contains an invalid attachment.")?;
+        let key = file
+            .get("key")
+            .and_then(Value::as_str)
+            .ok_or("The backup contains an invalid attachment.")?;
         let relative = portable_upload_key(key).or_else(|| {
             (source_name == Some("desktop")
                 && !key.is_empty()
-                && key.split(['/', '\\']).all(|part| !part.is_empty() && part != "." && part != "..")
-                && key.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'\\' | b'.' | b'_' | b'-')))
-                .then(|| key.replace('\\', "/"))
+                && key
+                    .split(['/', '\\'])
+                    .all(|part| !part.is_empty() && part != "." && part != "..")
+                && key.bytes().all(|byte| {
+                    byte.is_ascii_alphanumeric()
+                        || matches!(byte, b'/' | b'\\' | b'.' | b'_' | b'-')
+                }))
+            .then(|| key.replace('\\', "/"))
         });
         let Some(relative) = relative else { continue };
         adapted_files.push(json!({ "key": relative, "data": file.get("data").and_then(Value::as_str).unwrap_or_default() }));
     }
-    if let Some(event_files) = adapted_tables.get_mut("event_files").and_then(Value::as_array_mut) {
+    if let Some(event_files) = adapted_tables
+        .get_mut("event_files")
+        .and_then(Value::as_array_mut)
+    {
         for row in event_files {
-            let Some(reference) = row.get("storage_key").and_then(Value::as_str) else { continue };
-            if reference.starts_with("remote-pending:") || reference.starts_with("sync-pending:") { continue; }
+            let Some(reference) = row.get("storage_key").and_then(Value::as_str) else {
+                continue;
+            };
+            if reference.starts_with("remote-pending:") || reference.starts_with("sync-pending:") {
+                continue;
+            }
             let Some(relative) = portable_upload_key(reference) else {
-                if source_name == Some("web") { continue; }
-                return Err("This backup contains a file path outside the uploads directory.".to_string());
+                if source_name == Some("web") {
+                    continue;
+                }
+                return Err(
+                    "This backup contains a file path outside the uploads directory.".to_string(),
+                );
             };
             row["storage_key"] = Value::String(format!("uploads/{relative}"));
         }
     }
-    if let Some(users) = adapted_tables.get_mut("users").and_then(Value::as_array_mut) {
+    if let Some(users) = adapted_tables
+        .get_mut("users")
+        .and_then(Value::as_array_mut)
+    {
         if source_name == Some("web") {
             for row in users {
-                if row.get("avatar_url").and_then(Value::as_str).is_some_and(|avatar| avatar.starts_with("/api/avatars/")) {
+                if row
+                    .get("avatar_url")
+                    .and_then(Value::as_str)
+                    .is_some_and(|avatar| avatar.starts_with("/api/avatars/"))
+                {
                     row["avatar_url"] = Value::Null;
                 }
             }
         }
     }
+    adapted_tables.insert("eventpulse_backup_archive".to_string(), Value::Array(archived_tables.iter().map(|(table_name, rows)| json!({"table_name": table_name, "rows_json": serde_json::to_string(rows).unwrap_or_default()})).collect()));
     backup["tables"] = Value::Object(adapted_tables);
     backup["files"] = Value::Array(adapted_files);
     let tables = backup["tables"].as_object().unwrap();
@@ -282,7 +459,9 @@ fn validate_backup(backup: &mut Value, conn: &Connection) -> Result<(), String> 
                 .get("storage_key")
                 .and_then(Value::as_str)
                 .ok_or("The backup contains an invalid file record.")?;
-            if storage_key.starts_with("remote-pending:") || storage_key.starts_with("sync-pending:") {
+            if storage_key.starts_with("remote-pending:")
+                || storage_key.starts_with("sync-pending:")
+            {
                 continue;
             }
             let normalized = storage_key.replace('\\', "/");
@@ -305,6 +484,60 @@ fn validate_backup(backup: &mut Value, conn: &Connection) -> Result<(), String> 
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn backup_round_trip_preserves_foreign_table_columns() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE eventpulse_backup_archive (table_name TEXT PRIMARY KEY, rows_json TEXT NOT NULL);
+             CREATE TABLE users (id TEXT PRIMARY KEY, name TEXT NOT NULL);
+             INSERT INTO users(id, name) VALUES ('user-1', 'Alice');",
+        )
+        .unwrap();
+        let mut backup = json!({
+            "format": BACKUP_FORMAT,
+            "source": "web",
+            "version": BACKUP_VERSION,
+            "createdAt": "2026-01-01T00:00:00Z",
+            "tables": {
+                "users": [{"id": "user-1", "name": "Alice", "email": "alice@example.com", "web_only_field": "preserve me"}],
+                "web_only_table": [{"id": "row-1", "value": "preserve this row"}]
+            },
+            "files": []
+        });
+
+        validate_backup(&mut backup, &conn).unwrap();
+        let archive_rows = backup["tables"]["eventpulse_backup_archive"]
+            .as_array()
+            .unwrap();
+        assert_eq!(archive_rows.len(), 2);
+        for archived in archive_rows {
+            conn.execute(
+                "INSERT INTO eventpulse_backup_archive(table_name, rows_json) VALUES (?1, ?2)",
+                [
+                    archived["table_name"].as_str().unwrap(),
+                    archived["rows_json"].as_str().unwrap(),
+                ],
+            )
+            .unwrap();
+        }
+
+        let exported = create_backup_json(&conn, Path::new(".")).unwrap();
+        assert_eq!(
+            exported["tables"]["users"][0]["web_only_field"],
+            "preserve me"
+        );
+        assert_eq!(exported["tables"]["users"][0]["email"], "alice@example.com");
+        assert_eq!(
+            exported["tables"]["web_only_table"][0]["value"],
+            "preserve this row"
+        );
+    }
 }
 
 #[tauri::command]
@@ -458,6 +691,25 @@ pub fn restore_backup(
                     transaction
                         .execute(&sql, params_from_iter(values))
                         .map_err(|e| format!("Could not restore {table}: {e}"))?;
+                }
+            }
+            transaction
+                .execute("DELETE FROM eventpulse_backup_archive", [])
+                .map_err(|e| e.to_string())?;
+            if let Some(archive_rows) = tables
+                .get("eventpulse_backup_archive")
+                .and_then(Value::as_array)
+            {
+                for row in archive_rows {
+                    let table_name = row
+                        .get("table_name")
+                        .and_then(Value::as_str)
+                        .ok_or("The backup contains invalid archived database data.")?;
+                    let rows_json = row
+                        .get("rows_json")
+                        .and_then(Value::as_str)
+                        .ok_or("The backup contains invalid archived database data.")?;
+                    transaction.execute("INSERT INTO eventpulse_backup_archive(table_name, rows_json) VALUES (?1, ?2)", [table_name, rows_json]).map_err(|e| e.to_string())?;
                 }
             }
             transaction.commit().map_err(|e| e.to_string())?;
