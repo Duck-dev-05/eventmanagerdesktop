@@ -1,0 +1,104 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Font hints ──────────────────────────────────────────────────────────── */
+/* Cal Sans is a free display font; fall through to Inter if not loaded.       */
+@font-face {
+  font-family: "Cal Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: local("Cal Sans SemiBold"), local("CalSans-SemiBold");
+}
+
+/* ─── Custom properties ───────────────────────────────────────────────────── */
+:root {
+  --font-sans: "Inter", "Segoe UI Variable Text", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Cal Sans", "Inter", ui-sans-serif;
+
+  /* Canvas */
+  --color-canvas: #f5f6fb;
+  --color-panel: #ffffff;
+  --color-sunken: #f5f6fb;
+  --color-raised: #fafbfe;
+  --color-surface-elevated: #ffffff;
+
+  /* Ink */
+  --color-ink: #171d30;
+  --color-ink-soft: #3c455d;
+  --color-muted: #66718a;
+  --color-faint: #969fb3;
+
+  /* Lines */
+  --color-line: #e4e7f0;
+  --color-line-soft: #eef0f6;
+  --color-line-strong: #cfd5e3;
+
+  /* Accent (warmer) */
+  --color-accent: #6558d3;
+  --color-accent-hover: #786be2;
+  --color-accent-strong: #4f43b3;
+  --color-accent-soft: #f0efff;
+  --color-accent-line: #dddbfb;
+  --color-accent-ink: #4940a1;
+
+  /* Nav / Sidebar */
+  --color-nav: #151b2d;
+  --color-nav-soft: #222a40;
+  --color-nav-brand-top: #1a2237;
+  --color-nav-line: #2b3349;
+  --color-nav-ink: #f0f2fa;
+  --color-nav-muted: #a0a9bf;
+
+  /* Sidebar brand gradient */
+  --sidebar-brand-gradient: linear-gradient(160deg, #1e2741 0%, #151b2d 100%);
+
+  /* Semantic */
+  --color-success: #2f7d52;
+  --color-danger: #b4392f;
+  --color-warning: #a76a12;
+  --color-info: #3b5b96;
+
+  /* Sidebar width tokens (used in JS via CSS vars) */
+  --sidebar-w: 252px;
+  --sidebar-w-compact: 76px;
+}
+
+/* ─── Base resets ─────────────────────────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Better selection colors */
+::selection {
+  background-color: var(--color-accent-soft);
+  color: var(--color-accent-ink);
+}
+
+/* Smooth scrollbar (Webkit) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line-strong);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-muted);
+}
+
+/* Sidebar scrollbar (dark) */
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-nav-line);
+}
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--color-nav-muted);
+}

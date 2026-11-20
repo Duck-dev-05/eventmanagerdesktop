@@ -1,0 +1,48 @@
+src/components/icons.tsx(76,1): error TS1005: ')' expected.
+src/components/icons.tsx(92,4): error TS17008: JSX element 'svg' has no corresponding closing tag.
+src/components/icons.tsx(96,44): error TS17008: JSX element 'SVGSVGElement' has no corresponding closing tag.
+src/components/icons.tsx(96,61): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+src/components/icons.tsx(102,45): error TS17008: JSX element 'SVGSVGElement' has no corresponding closing tag.
+src/components/icons.tsx(102,62): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+src/components/icons.tsx(109,43): error TS17008: JSX element 'SVGSVGElement' has no corresponding closing tag.
+src/components/icons.tsx(109,60): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+src/components/icons.tsx(119,42): error TS17008: JSX element 'SVGSVGElement' has no corresponding closing tag.
+src/components/icons.tsx(119,59): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+src/components/icons.tsx(126,42): error TS17008: JSX element 'SVGSVGElement' has no corresponding closing tag.
+src/components/icons.tsx(126,59): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+src/components/icons.tsx(132,43): error TS17008: JSX element 'SVGSVGElement' has no corresponding closing tag.
+src/components/icons.tsx(132,60): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+src/components/icons.tsx(142,48): error TS17008: JSX element 'SVGSVGElement' has no corresponding closing tag.
+src/components/icons.tsx(142,65): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+src/components/icons.tsx(149,61): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+src/components/icons.tsx(158,5): error TS17002: Expected corresponding JSX closing tag for 'SVGSVGElement'.
+src/components/icons.tsx(161,44): error TS17008: JSX element 'SVGSVGElement' has no corresponding closing tag.
+src/components/icons.tsx(161,61): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+src/components/icons.tsx(168,43): error TS17008: JSX element 'SVGSVGElement' has no corresponding closing tag.
+src/components/icons.tsx(168,60): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+src/components/icons.tsx(175,44): error TS17008: JSX element 'SVGSVGElement' has no corresponding closing tag.
+src/components/icons.tsx(175,61): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+src/components/icons.tsx(183,48): error TS17008: JSX element 'SVGSVGElement' has no corresponding closing tag.
+src/components/icons.tsx(183,65): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+src/components/icons.tsx(191,46): error TS17008: JSX element 'SVGSVGElement' has no corresponding closing tag.
+src/components/icons.tsx(191,63): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+src/components/icons.tsx(196,3): error TS1005: '</' expected.
+src/components/sidebar.tsx(109,1): error TS1109: Expression expected.
+src/components/sidebar.tsx(109,24): error TS1003: Identifier expected.
+src/components/sidebar.tsx(114,1): error TS1109: Expression expected.
+src/components/sidebar.tsx(115,7): error TS1005: '}' expected.
+src/components/sidebar.tsx(116,16): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+src/components/sidebar.tsx(117,15): error TS1005: '}' expected.
+src/components/sidebar.tsx(117,66): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+src/components/sidebar.tsx(118,18): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+src/components/sidebar.tsx(118,28): error TS17008: JSX element 'void' has no corresponding closing tag.
+src/components/sidebar.tsx(119,1): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+src/components/sidebar.tsx(120,3): error TS1109: Expression expected.
+src/components/sidebar.tsx(124,17): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+src/components/sidebar.tsx(125,43): error TS1005: '}' expected.
+src/components/sidebar.tsx(126,3): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+src/components/sidebar.tsx(315,1): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+src/components/sidebar.tsx(317,9): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+src/components/sidebar.tsx(317,11): error TS1381: Unexpected token. Did you mean `{'}'}` or `&rbrace;`?
+src/components/sidebar.tsx(318,8): error TS1382: Unexpected token. Did you mean `{'>'}` or `&gt;`?
+src/pages/event-edit.tsx(253,2): error TS1005: ')' expected.

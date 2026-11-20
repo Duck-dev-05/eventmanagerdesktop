@@ -1,0 +1,91 @@
+name: Desktop installers
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-x64
+            runner: windows-latest
+            bundles: nsis,msi
+          - platform: macos
+            runner: macos-14
+            bundles: dmg
+          - platform: linux-x64
+            runner: ubuntu-22.04
+            bundles: deb,appimage
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            build-essential curl file libayatana-appindicator3-dev libssl-dev \
+            libwebkit2gtk-4.1-dev librsvg2-dev libxdo-dev wget
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Configure Google sign-in placeholder
+        run: node -e "require('node:fs').copyFileSync('src-tauri/google_oauth.example.json', 'src-tauri/google_oauth.json')"
+
+      - name: Check and test Rust backend
+        working-directory: src-tauri
+        run: |
+          cargo fmt -- --check
+          cargo check
+          cargo test
+
+      - name: Build installers
+        run: npx tauri build --bundles ${{ matrix.bundles }}
+
+      - name: Save installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventpulse-${{ matrix.platform }}
+          path: src-tauri/target/release/bundle/**/*
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    name: Publish GitHub release assets
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download installers
+        uses: actions/download-artifact@v4
+        with:
+          pattern: eventpulse-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish installers
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/**/*
+          fail_on_unmatched_files: true
